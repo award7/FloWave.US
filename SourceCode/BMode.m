@@ -1,4 +1,4 @@
-%% BMode
+%% BMode2
 % Purpose: This code was written to analyze ultrasound (US) B-mode images
 % from a digital video recording. The code uses an automated diameter 
 % subroutine to determine a blood vessel diameter. 
@@ -47,7 +47,7 @@ VidWidth = USObj.Width;
 nFrames = USObj.NumberofFrames;
 
 % Video Sampling Rate
-VidSamRate = USObj.FrameRate;
+VidSamRate = round(USObj.FrameRate);
 
 % Video End Time
 Duration = USObj.Duration;
@@ -82,76 +82,153 @@ while ScaleCheck == 0
     end
 end
 
-%% Calculate the Vessel Diameter
-DiameterPixel = zeros(nFrames,1);
+% set if baseline or FMD measure
+mode = input('Baseline or FMD b/f ', 's');
 
-for k = 1:nFrames
+%for FMD enter time offset (when video starts from moment of cuff release)
+timeoffset =0;
+if mode == 'f'
+    timeoffset = input('Enter time offset ' );
+end
+
+%set up counters for loop for repeat measures
+cont = 'y';
+runs =0;
+
+%recalibration rate allows for redesignation of ROI every designated amount
+%of seconds
+recal = input('Set a recalibration rate? y/n ', 's');
+if recal == 'y'
+    RedoSec = input('Enter recalibration rate in seconds');
+    frameRedo = VidSamRate*RedoSec;
+else 
+    frameRedo = nFrames+1;
+end
+
+%Set times 
+    dt = 1/VidSamRate;
+    DTime = (0:dt:nFrames*dt-dt)';
+
+    totalDiamsOrig(:,1) = DTime+timeoffset; %will hold raw data
+    totalDiamsFilt(:,1) = DTime+timeoffset; %will hold FFT filtered data
+
+%loop to redesignate ROI and recalculate diameter as long as continue = y
+while cont == 'y'
+    %counter for number of runs
+    runs = runs +1;
+
+    %% Calculate the Vessel Diameter
+    DiameterPixel = zeros(nFrames,1);
     
-    %Read Image at start of Video
-    Vessel = read(USObj,k);
+    for k = 1:nFrames
+        %Read Image at start of Video
+        Vessel = read(USObj,k);
+        %check if recalibration needs to be done
+        redo = mod(k,frameRedo);
+        if k==1 || redo == 0
+            %Select ROI around the vessel 
+            figure; imagesc(Vessel);
+            [DROIx,DROIy,Center,theta] = VesselROI(Vessel);
+        end
     
-    if k == 1
-        %Select ROI around the vessel 
-        figure; imagesc(Vessel);
-        [DROIx,DROIy,Center,theta] = VesselROI(Vessel);
-    end
-    
-    % Restrict image area to ROI
-    DiameterImage = Vessel(DROIy(1,1):DROIy(2,1),...
-        DROIx(1,1):DROIx(2,1));
+        % Restrict image area to ROI
+        DiameterImage = Vessel(DROIy(1,1):DROIy(2,1),...
+            DROIx(1,1):DROIx(2,1));
         
-    %Calculate the Diameter
-    DiameterPixel(k,1) = AutoDiameter(DiameterImage,Center',theta(1));
-end
-
-% Replace Gaps and Errant Values with Mean Diameter
-MeanD = mean(DiameterPixel(intersect(find(DiameterPixel~= 200),find(DiameterPixel~=0))));
-DiffD = diff(DiameterPixel(find(DiameterPixel~=0)))/MeanD;
-
-for i = 1:length(DiameterPixel)-1
-    if DiameterPixel(i,1) == 200
-        DiameterPixel(i,1) = MeanD;
+        %Calculate the Diameter
+        DiameterPixel(k,1) = AutoDiameter(DiameterImage,Center',theta(1));
     end
-end
 
-% If Diameter Varies by > 20% from the Mean, Replace with Mean Value
-for i = 1:length(DiffD)
-    if DiffD(i,1) > 0.2
-        DiameterPixel(i,1) = MeanD;
+    % Replace Gaps and Errant Values with Mean Diameter
+    MeanD = mean(DiameterPixel(intersect(find(DiameterPixel~= 200),find(DiameterPixel~=0))));
+    DiffD = diff(DiameterPixel(find(DiameterPixel~=0)))/MeanD;
+
+    %counter for frames that did not return a value
+    nReplacedNaN = 0;
+    for i = 1:length(DiameterPixel)
+        if DiameterPixel(i,1) == 200
+            DiameterPixel(i,1) = MeanD;
+            nReplacedNaN = nReplacedNaN+1;
+        end
     end
+    
+    % If Diameter Varies by > 30% from the Mean, Replace with Mean Value
+    % Counter for replaced outliers
+    nReplacedOut = 0;
+    for i = 1:length(DiffD)
+        if abs(DiffD(i,1)) > .3
+            DiameterPixel(i,1) = MeanD;
+            nReplacedOut = nReplacedOut+1;
+        end
+    end
+    
+    %percent of frames read
+    percentReadFrames = (nFrames- nReplacedNaN)/nFrames*100
+
+    % Convert Diameter to Centimeters
+    Diameter = DiameterPixel.*DistCon;
+    MeanDiam = mean(Diameter);
+    StdDiam = std(Diameter);
+
+
+%FMD noise reduction and data smoothing 
+if mode =='f'
+   totalDiamsOrig(:, runs+1) = Diameter;
+   
+   %FastFourierTransformFilter
+   [DFilt, a,b,c]= fftf(DTime, Diameter, [],150);
+   DFilt=transpose(DFilt);
+   totalDiamsFilt(:,runs+1)= DFilt;
+    
+   %averageFFT filter over 2 second intervals
+   pointsFFT = VidSamRate*2;
+   for i = 1:((length(Diameter)/(pointsFFT)))-1
+       totalDiamsCombo(i,1) = mean(DTime((((i-1)*pointsFFT)+1):i*pointsFFT,:))+timeoffset;
+       totalDiamsCombo(i,runs+1) = mean(DFilt((((i-1)*pointsFFT)+1):i*pointsFFT,:));
+   end
+   
+   %Find maxes of FFT & 2 sec average
+   [maxDCombo, maxTComboPos] = max(totalDiamsCombo(:,runs+1));
+   maxTCombo = totalDiamsCombo(maxTComboPos,1);
+   maxDiam(1,runs)=maxDCombo;
+   maxDiam(2,runs)=maxTCombo;
+   maxDiam
+
+else
+     % Filter Diameter - Smooth with Savitsky Golay Filter
+    MeanDiam
+    DFilt = sgolayfilt(Diameter,3,11);
+    totalDiamsOrig(:, runs+1) = Diameter;
+     
 end
-
-% Convert Diameter to Centimeters
-Diameter = DiameterPixel.*DistCon;
-MeanDiam = mean(Diameter);
-StdDiam = std(Diameter);
-
-% Diameter Time
-dt = 1/VidSamRate;
-DTime = (0:dt:nFrames*dt-dt)';
-
-% Filter Diameter - Smooth with Savitsky Golay Filter
-DFilt = sgolayfilt(Diameter,3,11);
     
 %% Plot and Summarize
 
 % Error Limits - +/- 10% from Mean Diameter
 % User Inspection of Data - If diameter exceeds error limits, repeat
 % epoch selection or enter a single diameter value.
-for i = 1:length(DFilt)
-    PosError(i,1) = mean(DFilt) + .1*mean(DFilt);
-    NegError(i,1) = mean(DFilt) - .1*mean(DFilt);
+for i = 1:length(totalDiamsOrig)
+    PosError(i,1) = mean(totalDiamsOrig(:,runs+1)) + .1*mean(totalDiamsOrig(:,runs+1));
+    NegError(i,1) = mean(totalDiamsOrig(:,runs+1)) - .1*mean(totalDiamsOrig(:,runs+1));
 end
 
+%original
 figure, grid on, hold on;
-plot(DTime, DFilt,'r','DisplayName','Filtered Diameter', 'LineWidth', 2); hold on;
-plot(DTime,PosError,'k','LineWidth',2); hold on;
-plot(DTime,NegError,'k', 'LineWidth',2); hold off;
-title('Vessel Diameter & +/- 10% Error Limits');
+plot(DTime+timeoffset, totalDiamsOrig(:,runs+1),'b','DisplayName','Original Diameter', 'LineWidth', 2); hold on;
+plot(DTime+timeoffset,PosError,'k','LineWidth',2); hold on;
+plot(DTime+timeoffset,NegError,'k', 'LineWidth',2); hold on;
+title('Filtered Vessel Diameter & +/- 10% Error Limits');
 xlabel('Time(s)');
 ylabel('Diameter (cm)');
 legend('Diameter');
-pause;
 
-DistCon
-MeanDiam
+if mode == 'f'
+    plot(totalDiamsCombo(:,1),totalDiamsCombo(:,runs+1),'r','DisplayName','Smoothed Diameter', 'LineWidth', 2); hold on;
+    legend('Raw Diameter', 'Filtered Diameter');
+    hold off;
+end
+
+cont = input('Continue? y/n ', 's');
+end
+
+
