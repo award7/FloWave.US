@@ -96,4 +96,3 @@ end
 
 clear LowLoc UpLoc LowWall UpWall ImageDiameter FilteredD I
 
-

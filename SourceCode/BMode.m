@@ -116,7 +116,8 @@ end
 while cont == 'y'
     %counter for number of runs
     runs = runs +1;
-
+RedoSec = input('Enter recalibration rate in seconds');
+    frameRedo = VidSamRate*RedoSec;
     %% Calculate the Vessel Diameter
     DiameterPixel = zeros(nFrames,1);
     
@@ -197,7 +198,7 @@ if mode =='f'
 else
      % Filter Diameter - Smooth with Savitsky Golay Filter
     MeanDiam
-    DFilt = sgolayfilt(Diameter,3,11);
+    %DFilt = sgolayfilt(Diameter,3,11);
     totalDiamsOrig(:, runs+1) = Diameter;
      
 end
