@@ -116,11 +116,12 @@ end
 while cont == 'y'
     %counter for number of runs
     runs = runs +1;
-RedoSec = input('Enter recalibration rate in seconds');
-    frameRedo = VidSamRate*RedoSec;
+
     %% Calculate the Vessel Diameter
     DiameterPixel = zeros(nFrames,1);
-    
+    newROI ='y';
+    while newROI == 'y'
+        
     for k = 1:nFrames
         %Read Image at start of Video
         Vessel = read(USObj,k);
@@ -130,14 +131,22 @@ RedoSec = input('Enter recalibration rate in seconds');
             %Select ROI around the vessel 
             figure; imagesc(Vessel);
             [DROIx,DROIy,Center,theta] = VesselROI(Vessel);
+             % Restrict image area to ROI
+            DiameterImage = Vessel(DROIy(1,1):DROIy(2,1),...
+                DROIx(1,1):DROIx(2,1));
+            AutoDiameter(DiameterImage,Center',theta(1),1);
+            
+            newROI = input('Change ROI? y/n ', 's');
+
         end
+    end
     
         % Restrict image area to ROI
         DiameterImage = Vessel(DROIy(1,1):DROIy(2,1),...
             DROIx(1,1):DROIx(2,1));
         
         %Calculate the Diameter
-        DiameterPixel(k,1) = AutoDiameter(DiameterImage,Center',theta(1));
+        DiameterPixel(k,1) = AutoDiameter(DiameterImage,Center',theta(1),0);
     end
 
     % Replace Gaps and Errant Values with Mean Diameter
@@ -198,7 +207,7 @@ if mode =='f'
 else
      % Filter Diameter - Smooth with Savitsky Golay Filter
     MeanDiam
-    %DFilt = sgolayfilt(Diameter,3,11);
+    DFilt = sgolayfilt(Diameter,3,11);
     totalDiamsOrig(:, runs+1) = Diameter;
      
 end

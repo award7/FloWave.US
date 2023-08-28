@@ -1,9 +1,9 @@
- function DiameterPixel = AutoDiameter(I, Center, theta)
+ function DiameterPixel = AutoDiameter(I, Center, theta, check)
 %AUTODIAMETER Measure vessel diameter using edge detection.
 %   AUTODIAMETER uses the Canny edge detection function to detect the
 %   vessel edges within a user defined region of interest (ROI). 
 %
-%   DiameterPixel = AUTODIAMETER(I, Center, theta) gets the image of the
+%   DiameterPixel = AUTODIAMETER(I, Center, theta,check) gets the image of the
 %   user-defined ROI, the vessel center location, and the vessel wall angle
 %   and returns the diameter in pixels for the specific image frame.  
 %
@@ -36,6 +36,11 @@ BWdfill = imfill(BWsdil,'holes');
 % Edge Detect 
 IEdge = edge(BWdfill, 'canny');
 NumRow = size(IEdge,1);
+
+if check ==1
+    figure; 
+    imshow(labeloverlay(I,IEdge, 'Colormap','autumn','Transparency',0.25))
+end
 
 % Calculate Diameter
 LowWall = zeros(NumRow,1);
@@ -95,4 +100,5 @@ else
 end
 
 clear LowLoc UpLoc LowWall UpWall ImageDiameter FilteredD I
+
 
