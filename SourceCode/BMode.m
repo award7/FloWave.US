@@ -119,8 +119,7 @@ while cont == 'y'
 
     %% Calculate the Vessel Diameter
     DiameterPixel = zeros(nFrames,1);
-    newROI ='y';
-    while newROI == 'y'
+
         
     for k = 1:nFrames
         %Read Image at start of Video
@@ -129,6 +128,8 @@ while cont == 'y'
         redo = mod(k,frameRedo);
         if k==1 || redo == 0
             %Select ROI around the vessel 
+            newROI ='y';
+            while newROI == 'y'
             figure; imagesc(Vessel);
             [DROIx,DROIy,Center,theta] = VesselROI(Vessel);
              % Restrict image area to ROI
@@ -138,16 +139,20 @@ while cont == 'y'
             
             newROI = input('Change ROI? y/n ', 's');
 
+            end
         end
-    end
-    
+
+      
         % Restrict image area to ROI
         DiameterImage = Vessel(DROIy(1,1):DROIy(2,1),...
-            DROIx(1,1):DROIx(2,1));
-        
+                DROIx(1,1):DROIx(2,1));
         %Calculate the Diameter
         DiameterPixel(k,1) = AutoDiameter(DiameterImage,Center',theta(1),0);
+   
     end
+    
+        
+
 
     % Replace Gaps and Errant Values with Mean Diameter
     MeanD = mean(DiameterPixel(intersect(find(DiameterPixel~= 200),find(DiameterPixel~=0))));
