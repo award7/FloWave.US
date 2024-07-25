@@ -1,0 +1,56 @@
+[project]
+name = "pyadf"
+dynamic = ["version"]
+description = "Python client library for Atlassian Document Format (ADF)"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = "MIT"
+keywords = []
+authors = [
+  { name =  "Center for Health Disparities Research (CHDR), University of Wisconsin School of Medicine and Public Health", email = "chdr_data_ops@medicine.wisc.edu" }
+]
+classifiers = [
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: Implementation :: CPython",
+]
+# global dependencies
+dependencies = [
+]
+
+[project.optional-dependencies]
+dev = [
+  "hatch",
+  "hatch-conda",
+  "mypy>=1.0.0",
+]
+test = [
+  "pytest",
+  "atlassian-python-api"
+]
+
+[project.urls]
+Documentation = ""
+Issues = ""
+Source = ""
+
+# hatch configurations
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "pyadf/__version__.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+# environment definitions
+[tool.hatch.envs.default]
+type = "conda"
+platforms = ["linux", "macos"]
+description = "Default environment with Python 3.11"
+features = [
+  "dev",
+  "test"
+]
