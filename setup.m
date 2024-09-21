@@ -1,0 +1,2 @@
+addpath("flowave/");
+addpath("tests/");
